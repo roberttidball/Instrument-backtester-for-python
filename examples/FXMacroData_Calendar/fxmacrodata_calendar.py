@@ -1,12 +1,13 @@
 """FXMacroData release-calendar helper for forex backtest examples."""
 
 import json
+import os
 from datetime import date, timedelta
 from urllib.parse import urlencode
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 
-BASE_URL = "https://fxmacrodata.com/api/v1/calendar/{currency}"
+BASE_URL = "https://api.fxmacrodata.com/v1/calendar/{currency}"
 
 
 def fetch_calendar(currency="USD", start_date=None, end_date=None, timeout=20):
@@ -14,8 +15,11 @@ def fetch_calendar(currency="USD", start_date=None, end_date=None, timeout=20):
     start_date = start_date or today.isoformat()
     end_date = end_date or (today + timedelta(days=14)).isoformat()
     query = urlencode({"start_date": start_date, "end_date": end_date})
+    api_key = os.getenv("FXMACRODATA_API_KEY")
+    headers = {"X-API-Key": api_key} if api_key else {}
+    request = Request("{}?{}".format(BASE_URL.format(currency=currency), query), headers=headers)
 
-    with urlopen("{}?{}".format(BASE_URL.format(currency=currency), query), timeout=timeout) as response:
+    with urlopen(request, timeout=timeout) as response:
         payload = json.load(response)
 
     return payload.get("data", [])
