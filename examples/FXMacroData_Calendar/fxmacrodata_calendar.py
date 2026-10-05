@@ -15,14 +15,21 @@ def fetch_calendar(currency="USD", start_date=None, end_date=None, timeout=20):
     start_date = start_date or today.isoformat()
     end_date = end_date or (today + timedelta(days=14)).isoformat()
     query = urlencode({"start_date": start_date, "end_date": end_date})
-    api_key = os.getenv("FXMACRODATA_API_KEY")
-    headers = {"X-API-Key": api_key} if api_key else {}
-    request = Request("{}?{}".format(BASE_URL.format(currency=currency), query), headers=headers)
+    api_key = (os.getenv("FXMACRODATA_API_KEY") or "").strip()
+    if any(ch.isspace() or ord(ch) < 32 for ch in api_key):
+        raise ValueError("FXMACRODATA_API_KEY contains invalid characters")
+    request = Request("{}?{}".format(BASE_URL.format(currency=currency), query))
+    if api_key:
+        # Unredirected: the key is never forwarded if the API answers with a redirect.
+        request.add_unredirected_header("X-API-Key", api_key)
 
     with urlopen(request, timeout=timeout) as response:
         payload = json.load(response)
 
-    return payload.get("data", [])
+    if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
+        detail = payload.get("detail") if isinstance(payload, dict) else None
+        raise RuntimeError("Unexpected FXMacroData response: {}".format(detail or "missing data list"))
+    return payload["data"]
 
 
 def top_tier_blackout_dates(events):
